@@ -1,6 +1,6 @@
 FROM php:8.2-cli
 
-# Install system dependencies
+# Install system dependencies + SQLite
 RUN apt-get update && apt-get install -y \
     git \
     unzip \
@@ -8,12 +8,12 @@ RUN apt-get update && apt-get install -y \
     libpng-dev \
     libonig-dev \
     libxml2-dev \
-    libpq-dev \
-    default-mysql-client \
+    sqlite3 \
+    libsqlite3-dev \
     curl \
     && docker-php-ext-install \
         pdo \
-        pdo_mysql \
+        pdo_sqlite \
         mbstring \
         bcmath \
         exif \
@@ -43,11 +43,17 @@ RUN composer install \
     --prefer-dist \
     --optimize-autoloader
 
-# Install frontend dependencies and build Vite
+# Install frontend dependencies
 RUN npm install
+
+# Build Vite
 RUN npm run build
 
-# Prepare Laravel directories
+# Buat SQLite database
+RUN mkdir -p database
+RUN touch database/database.sqlite
+
+# Buat folder Laravel
 RUN mkdir -p \
     storage/framework/cache \
     storage/framework/sessions \
@@ -59,12 +65,12 @@ RUN mkdir -p \
 RUN php artisan storage:link || true
 
 # Permission
-RUN chmod -R 775 storage bootstrap/cache
+RUN chmod -R 775 storage bootstrap/cache database
 
 # Clear Laravel cache
 RUN php artisan optimize:clear
 
-# Railway uses $PORT
+# Railway PORT
 EXPOSE 8080
 
 CMD php artisan migrate --force && \

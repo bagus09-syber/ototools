@@ -67,11 +67,9 @@ RUN php artisan storage:link || true
 # Permission
 RUN chmod -R 775 storage bootstrap/cache database
 
-# Clear Laravel cache
-RUN php artisan optimize:clear
-
 # Railway PORT
 EXPOSE 8080
 
+# Jalankan migration lalu Laravel
 CMD php artisan migrate --force && \
     php artisan serve --host=0.0.0.0 --port=${PORT:-8080}

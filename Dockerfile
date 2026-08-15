@@ -1,34 +1,71 @@
 FROM php:8.2-cli
 
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     git \
     unzip \
-    libsqlite3-dev \
-    && docker-php-ext-install pdo_sqlite \
+    libzip-dev \
+    libpng-dev \
+    libonig-dev \
+    libxml2-dev \
+    libpq-dev \
+    default-mysql-client \
+    curl \
+    && docker-php-ext-install \
+        pdo \
+        pdo_mysql \
+        mbstring \
+        bcmath \
+        exif \
+        pcntl \
+        zip \
+        xml \
     && rm -rf /var/lib/apt/lists/*
 
+# Install Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+# Install Node.js + npm
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get update \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /var/www/html
 
+# Copy project
 COPY . .
 
+# Install PHP dependencies
 RUN composer install \
     --no-dev \
     --no-interaction \
     --prefer-dist \
     --optimize-autoloader
 
-RUN touch database/database.sqlite
+# Install frontend dependencies and build Vite
+RUN npm install
+RUN npm run build
 
-RUN mkdir -p storage/framework/cache \
+# Prepare Laravel directories
+RUN mkdir -p \
+    storage/framework/cache \
     storage/framework/sessions \
     storage/framework/views \
-    storage/logs
+    storage/logs \
+    bootstrap/cache
 
+# Storage link
+RUN php artisan storage:link || true
+
+# Permission
 RUN chmod -R 775 storage bootstrap/cache
 
-EXPOSE 10000
+# Clear Laravel cache
+RUN php artisan optimize:clear
 
-CMD php artisan migrate:fresh --seed --force && \
-    php artisan serve --host=0.0.0.0 --port=${PORT:-10000}
+# Railway uses $PORT
+EXPOSE 8080
+
+CMD php artisan migrate --force && \
+    php artisan serve --host=0.0.0.0 --port=${PORT:-8080}
